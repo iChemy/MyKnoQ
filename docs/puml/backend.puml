@@ -1,18 +1,19 @@
 @startuml backend
 
 package domain <<Frame>> {
-    enum UserState {
-        凍結
-        有効
-        一時停止
+    enum UserAccountState {
+        Dead
+        Alive
+        Freezed
     }
 
     class User {
         + UUID id
         + String name
+        + String displayName
         + String icon
         + boolean privileged
-        + UserState state
+        + UserAccountState state
     }
 
     class Tag {
@@ -128,6 +129,7 @@ RoomVenue "0..*" <--|> "1" Room
 Room --|> "1" User : createdBy
 
 Group "0..*" <--|> "0..*" User : グループメンバー
+Group "0..*" <--|> "1..*" User : グループアドミン
 
 package infra <<Frame>> {
 
@@ -172,6 +174,13 @@ package db <<Frame>> {
         + Group addUsersToGroup(UUID groupID, List<UUID> userIDs)
         + Group removeUserFromGroup(UUID groupID, UUID userID)
         + Group removeUsersFromGroup(UUID groupID, List<UUID> userIDs)
+
+        + Group addUserToGroupAdmin(UUID groupID, UUID userID)
+        + Group addUsersToGroupAdmin(UUID groupID, List<UUID> userIDs)
+        + Group removeUserFromGroupAdmin(UUID groupID, UUID userID)
+        + Group removeUsersFromGroupAdmin(UUID groupID, List<UUID> userIDs)
+
+        + List<TraqQGroup> getAllTraQGroups()
     }
 
     class KnoQDatabaseAPI implements DatabaseRepository {
@@ -183,7 +192,7 @@ package model <<Frame>> {
         + String name
         + String icon
         + boolean privileged
-        + UserState state
+        + UserAccountState state
     }
 
     class DBTag {
@@ -279,6 +288,8 @@ DBEvent --|> "1" DBGroup : groupID で指定
 
 ' 定期的に traQ の api を叩いてこれを更新する必要がある
 DBGroup "0..*" <--|> "0..*" DBUser : メンバー many2many
+DBGroup "0..*" <--|> "1..*" DBUser : アドミン many2many
+
 
 
 @enduml
