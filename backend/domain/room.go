@@ -12,6 +12,6 @@ type Room struct {
 	StartAt time.Time
 	EndAt   time.Time
 	Model
-
-	CreatedBy User
+	CreatedBy  User
+	RoomVenues []RoomVenue
 }

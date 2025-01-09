@@ -90,6 +90,7 @@ package domain <<Frame>> {
     ' Room
     class RoomVenue implements Venue {
         + boolean shareable
+        + UUID roomID
     }
 
 ' ここから内部クラス
@@ -124,7 +125,7 @@ Event "1" <--|> "0..*" UserAttendance : 出席対象ユーザー
 
 UserAttendance <--|> User
 
-RoomVenue "0..*" <--|> "1" Room
+RoomVenue "0..*" <|--> "1" Room
 
 Room --|> "1" User : createdBy
 
@@ -238,16 +239,18 @@ package model <<Frame>> {
         + UUID createdByID
         + UUID groupID
 
-        + VenueType venueType
-        + String venueName
-        + Time venueStartAt
-        + Time venueEndAt
-        + Optional<boolean> venueShareable
-        + Optional<UUID> venueRoomID
-
         + Time createdAt
         + Time updatedAt
         + Optional<Time> deletedAt
+    }
+
+    class DBVenue {
+        + VenueType venueType
+        + String name
+        + Time startAt
+        + Time endAt
+        + Optional<boolean> shareable
+        + Optional<UUID> roomID
     }
 
     ' class DBEventTag {
@@ -285,6 +288,11 @@ DBEvent --|> "0, 1" DBRoom
 DBEvent --|> "1" DBUser : createdByID で指定
 
 DBEvent --|> "1" DBGroup : groupID で指定
+
+DBEvent --|> "1" DBVenue
+
+' このDBVenue の venueType は room でないといけない
+DBVenue "0..*" <|-- DBRoom
 
 ' 定期的に traQ の api を叩いてこれを更新する必要がある
 DBGroup "0..*" <--|> "0..*" DBUser : メンバー many2many

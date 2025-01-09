@@ -23,38 +23,40 @@ services:
       - ./docs/swagger/swagger.yaml:/swagger.yaml
     environment:
       SWAGGER_JSON: /swagger.yaml
-  # app:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     TZ: Asia/Tokyo
-  #     MARIADB_USER: root
-  #     MARIADB_PASSWORD: password
-  #     MARIADB_HOST: db
-  #     MARIADB_DATABASE: myknoq
-  #     MARIADB_PORT: 3306
-  #   ports:
-  #     - 8000:8000
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   develop:
-  #     watch:
-  #       - action: rebuild
-  #         path: ./
-  # db:
-  #   image: mariadb:latest
-  #   environment:
-  #     MYSQL_ROOT_PASSWORD: password
-  #     MYSQL_DATABASE: myknoq
-  #   volumes:
-  #     - "./_development/mariadb:/var/lib/mysql"
-  #   expose:
-  #     - "3306"
-  #   healthcheck:
-  #     test: mariadb --user=root --password=password --execute "SHOW DATABASES;"
-  #     interval: 1s
-  #     timeout: 10s
-  #     retries: 60
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: knoq_app
+    environment:
+      TZ: Asia/Tokyo
+      MARIADB_USER: root
+      MARIADB_PASSWORD: password
+      MARIADB_HOST: db
+      MARIADB_DATABASE: myknoq
+      MARIADB_PORT: 3306
+    ports:
+      - 8000:8000
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: rebuild
+          path: ./
+  db:
+    image: mariadb:latest
+    container_name: knoq_db
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: myknoq
+    volumes:
+      - "./_development/mariadb:/var/lib/mysql"
+    expose:
+      - "3306"
+    healthcheck:
+      test: mariadb --user=root --password=password --execute "SHOW DATABASES;"
+      interval: 1s
+      timeout: 10s
+      retries: 60
     
