@@ -1,43 +1,104 @@
 package domain
 
 import (
-	"github.com/google/uuid"
+	"database/sql"
+	"database/sql/driver"
+	"fmt"
+
+	"github.com/gofrs/uuid"
 )
 
-type GroupType int
+type GroupType uint
 
 const (
-	TypeKnoQGroup GroupType = iota
-	TypeTraQGroup
+	GroupTypeTraq GroupType = iota
+	GroupTypeKnoq
+	GroupTypeLimit
 )
 
-type Group interface {
-	GetGroupType() GroupType
-}
-
 type GroupCore struct {
-	ID          uuid.UUID
-	Name        string
-	Description string
-	Members     []User
-	Admins      []User
 	Model
+	ID        uuid.UUID
+	GroupType GroupType
+	Name      string
+	Members   []Membership
 }
 
-type KnoQGroup struct {
+type MembershipType uint
+
+const (
+	MembershipAdmin MembershipType = iota
+	MembershipMember
+	MembershipLimit
+)
+
+type Membership struct {
+	User           User
+	MembershipType MembershipType
+}
+
+type Group interface {
+	GetGroupCore() GroupCore
+}
+
+type TraqGroup struct {
+	GroupCore
+	TraqID uuid.UUID
+}
+
+func (tg TraqGroup) GetGroupCore() GroupCore {
+	return tg.GroupCore
+}
+
+type KnoqGroup struct {
 	GroupCore
 	JoinFree bool
 }
 
-func (g KnoQGroup) GetGroupType() GroupType {
-	return TypeKnoQGroup
+func (kg KnoqGroup) GetGroupCore() GroupCore {
+	return kg.GroupCore
 }
 
-type TraQGroup struct {
-	GroupCore
-	TraQGroupID uuid.UUID
+func (g *GroupType) Scan(src interface{}) error {
+	s := sql.NullByte{}
+	if err := s.Scan(src); err != nil {
+		return err
+	}
+
+	if s.Valid {
+		newGT := GroupType(s.Byte)
+		if newGT >= GroupTypeLimit {
+			return fmt.Errorf("GroupType(%d) must be less than %d", newGT, GroupTypeLimit)
+		}
+
+		*g = newGT
+	}
+
+	return nil
 }
 
-func (g TraQGroup) GetGroupType() GroupType {
-	return TypeTraQGroup
+func (g GroupType) Value() (driver.Value, error) {
+	return sql.NullByte{Byte: byte(g), Valid: true}.Value()
+}
+
+func (m *MembershipType) Scan(src interface{}) error {
+	s := sql.NullByte{}
+	if err := s.Scan(src); err != nil {
+		return err
+	}
+
+	if s.Valid {
+		newMT := MembershipType(s.Byte)
+		if newMT >= MembershipLimit {
+			return fmt.Errorf("MembershipType(%d) must be less than %d", newMT, MembershipLimit)
+		}
+
+		*m = newMT
+	}
+
+	return nil
+}
+
+func (m MembershipType) Value() (driver.Value, error) {
+	return sql.NullByte{Byte: byte(m), Valid: true}.Value()
 }

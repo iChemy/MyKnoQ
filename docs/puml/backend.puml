@@ -1,303 +1,216 @@
 @startuml backend
 
 package domain <<Frame>> {
-    enum UserAccountState {
-        Dead
-        Alive
-        Freezed
-    }
+    enum TraqUserState {}
 
     class User {
         + UUID id
         + String name
-        + String displayName
-        + String icon
         + boolean privileged
-        + UserAccountState state
+
+        ' traQ依存
+        + String displayName
+        + TraqUserState traqState
+        + Time updatedAt
     }
 
-    class Tag {
+    enum GroupType {
+        GroupTypeTraq
+        GroupTypeKnoq
+    }
+
+    interface Group {
+        + UUID id
+        + GroupType groupType
+
+        ' traQ依存
+        + String name
+        + Time updatedAt
+    }
+
+    class TraqGroup implements Group {
+        + UUID traqID
+    }
+
+    class KnoqGroup implements Group {
+        + boolean joinFree
+    }
+
+    enum MembershipType {
+        Admin
+        Member
+    }
+
+    class Membership {
+        ' traQ依存
+        + MembershipType membershipType
+
+        ' Group の updatedAt でこと足りるかもしれない
+        + Time updatedAt
+    }
+    ' traQ依存
+    Group --|> "0..*" Membership : members
+    Membership --|> "1" User : user
+
+    enum EventType {
+        EventTypeRoom
+        EventTypePrivate
+    }
+
+    interface Event {
         + UUID id
         + String name
-        + Time createdAt
-        + Time updatedAt
-        + Optional<Time> deletedAt
+        + Time startAt
+        + Time endAt
+        + EventType eventType
+        + String venueName
     }
+
+    class RoomEvent implements Event {
+        + boolean shareable
+    }
+
+    class PrivateEvent implements Event {
+    }
+
+    enum ParticipationState {
+        Unconfirmed
+        Attend
+        Absent
+    }
+
+    class Participation {
+        + ParticipationState participationState
+    }
+
+    Event --|> "1" Group : group
+    Event --|> "1" User : createdBy
+    Event --|> "1..*" User : eventAdmins
+
+    ' traQ 依存
+    Event --|> "0..*" Participation : participations
+    Participation --|> "1" User : user
 
     class Room {
         + UUID id
         + String name
         + Time startAt
         + Time endAt
-        + Time createdAt
-        + Time updatedAt
-        + Optional<Time> deletedAt
     }
 
-    class Event {
+    Room --|> "0..*" RoomEvent : 借りている講義室で開催されるイベント
+    Room --|> "1" User : createdBy
+
+
+    class Tag {
         + UUID id
         + String name
-        + String description
-        ' グループ外の人でも参加できる
-        + boolean open
-        + Time createdAt
-        + Time updatedAt
-        + Optional<Time> deletedAt
     }
-
-    enum GroupType {
-        knoQ
-        traQ
-    }
-
-    interface Group {
-        + UUID id
-        + String name
-        + String description
-        + Time createdAt
-        + Time updatedAt
-        + Optional<Time> deletedAt
-
-        + GroupType getGroupType()
-    }
-
-    class KnoQGroup implements Group {
-        + boolean joinFree
-    }
-
-    class TraqQGroup implements Group {
-        + UUID traQGroupID
-    }
-
-    enum VenueType {
-        private
-        room
-    }
-
-    ' id はいらない．
-    ' Venue 単体で指定することは想定していない (イベントありき)
-    interface Venue {
-        + String name
-        + Time startAt
-        + Time endAt
-
-        + VenueType getVenueType()
-    }
-
-    ' Discord や Zoom など
-    class PrivateVenue implements Venue {}
-
-    ' Room
-    class RoomVenue implements Venue {
-        + boolean shareable
-        + UUID roomID
-    }
-
-' ここから内部クラス
-    ' class EventTag {
-    '     + boolean locked
-    ' }
-
-    enum AttendanceState {
-        unconfirmed
-        attendance
-        absence
-    }
-
-    class UserAttendance {
-        + AttendanceState state
-    }
+    Event --|> "0..*" Tag : tags
 }
 
-Event --|> "1" Group : 参加対象グループ
-
-' Event <--|> "0..*" EventTag
-' EventTag <--|> "1" Tag
-
-Event "0..*" <--|> "0..*" Tag
-
-Event --|> Venue : イベント開催場所
-
-Event <--|> "1" User : createdBy
-
-' Event.参加対象グループ のメンバーと同じであるべき
-Event "1" <--|> "0..*" UserAttendance : 出席対象ユーザー
-
-UserAttendance <--|> User
-
-RoomVenue "0..*" <|--> "1" Room
-
-Room --|> "1" User : createdBy
-
-Group "0..*" <--|> "0..*" User : グループメンバー
-Group "0..*" <--|> "1..*" User : グループアドミン
-
 package infra <<Frame>> {
-
 package db <<Frame>> {
-
-    interface DatabaseRepository {
-        + User getUserByID(UUID id)
-        + Room getRoomByID(UUID id)
-        + Group getGroupByID(UUID id)
-        + Event getEventByID(UUID id)
-        + Tag getTagByID(UUID id)
-
-        + Venue getVenueFromEvent(UUID eventID)
-        + List<Event> getEventsFromTag(UUID tagID)
-        + List<Event> getAttendableEventsFromUser(UUID userID)
-        + List<Group> getJoiningGroupsFromUser(UUID userID)
-
-        + User updateUser(User u)
-        + Room updateRoom(Room r)
-        + Group updateGroup(Groups g)
-        + Event updateEvent(Event e)
-        + Tag updateTag(Tag t)
-
-        ' EventTag
-        + Event addTagToEvent(UUID eventID, UUID tagID)
-        + Event addTagsToEvent(UUID eventID, List<UUID> tagIDs)
-        + Event removeTagFromEvent(UUID eventID, UUID tagID)
-        + Event removeTagsFromEvent(UUID eventID, List<UUID> tagIDs)
-
-        ' イベント作成時， 更新時， グループメンバー変更時等にのみ呼ばれるべき．
-        ' これを web API で直接動かせはしない
-        ' EventAttendance 作成時は unconfirmed
-        - Event addUserToEventAttendance(UUID eventID, UUID userID)
-        - Event addUsersToEventAttendance(UUID eventID, List<UUID> userIDs)
-        - Event removeUserFromEventAttendance(UUID eventID, UUID userID)
-        - Event removeUsersFromEventAttendance(UUID eventID, List<UUID> userIDs)
-
-        + Event updateAttendanceState(UUID userID, UUID eventID, AttendanceState newState)
-
-        ' knoQ オリジナルのグループに対してのみ
-        + Group addUserToGroup(UUID groupID, UUID userID)
-        + Group addUsersToGroup(UUID groupID, List<UUID> userIDs)
-        + Group removeUserFromGroup(UUID groupID, UUID userID)
-        + Group removeUsersFromGroup(UUID groupID, List<UUID> userIDs)
-
-        + Group addUserToGroupAdmin(UUID groupID, UUID userID)
-        + Group addUsersToGroupAdmin(UUID groupID, List<UUID> userIDs)
-        + Group removeUserFromGroupAdmin(UUID groupID, UUID userID)
-        + Group removeUsersFromGroupAdmin(UUID groupID, List<UUID> userIDs)
-
-        + List<TraqQGroup> getAllTraQGroups()
-    }
-
-    class KnoQDatabaseAPI implements DatabaseRepository {
-    }
-
-package model <<Frame>> {
     class DBUser {
         + UUID id
         + String name
-        + String icon
         + boolean privileged
-        + UserAccountState state
+
+        ' traQ依存
+        + String displayName
+        + TraqUserState traqState
+        + Time updatedAt
     }
 
-    class DBTag {
+    class DBGroup {
+        + UUID id
+        + GroupType groupType
+
+        + Optional<UUID> traqID
+
+        + Optional<boolean> joinFree
+
+        ' traQ依存
+        + String name
+        + Time updatedAt
+    }
+
+    class DBMembership {
+        + UUID userID
+        + UUID groupID
+
+        ' traQ依存
+        + MembershipType membershipType
+        + Time updatedAt
+    }
+
+    ' reference groupID
+    DBGroup --|> "0..*" DBMembership : members
+    ' foreignKey userID
+    DBMembership --|> "1" DBUser : user
+
+    class DBEvent {
         + UUID id
         + String name
-        + Time createdAt
-        + Time updatedAt
-        + Optional<Time> deletedAt
+        + Time startAt
+        + Time endAt
+        + EventType eventType
+        + UUID groupID
+        + UUID createdByID
+
+        + Optional<boolean> shareable
+        + Optional<UUID> roomID
+
+        + Optional<String> privateVenueName
     }
+
+    class DBParticipant {
+        + UUID userID
+        + UUID eventID
+        + ParticipationState participationState
+    }
+
+
+    ' foreignKey: groupID
+    DBEvent --|> "1" DBGroup : group
+    ' foreignKey createdByID
+    DBEvent --|> "1" DBUser : createdBy
+    DBEvent --|> "1..*" DBUser : eventAdmins
+
+    ' foreignKey userID
+    DBParticipant --|> "1" DBUser : user
+
+    ' traQ依存
+    'reference eventID
+    DBEvent --|> DBParticipant : participants
 
     class DBRoom {
         + UUID id
         + String name
         + Time startAt
         + Time endAt
-        + UUID createdBy
-        + Time createdAt
-        + Time updatedAt
-        + Optional<Time> deletedAt
-    }
-
-    class DBGroup {
-        + GroupType groupType
-        + UUID id
-        + String name
-        + String description
-        ' groupType が knoQ のときのみ値がある
-        + Optional<boolean> joinFree
-        ' groupType が traQ のときのみ値がある
-        + Optional<UUID> traQGroupID
-
-        + Time createdAt
-        + Time updatedAt
-        + Optional<Time> deletedAt
-    }
-
-    ' Event with Venue
-    class DBEvent {
-        + UUID id
-        + String name
-        + String description
-        + boolean open
         + UUID createdByID
-        + UUID groupID
-
-        + Time createdAt
-        + Time updatedAt
-        + Optional<Time> deletedAt
     }
 
-    class DBVenue {
-        + VenueType venueType
+    ' foreignKey createdByID
+    DBRoom --|> "1" DBUser : createdBy
+
+
+
+    ' 循環参照 (最終的には Room の Name だけ欲しい)
+    ' RoomEvent のみ Room を保持するため Optional で実装されるべき
+    ' foreignKey: roomID
+    DBEvent ..|> "0..1" DBRoom : room
+    DBRoom ..|> "0..*" DBEvent : events
+
+
+    class DBTag {
+        + UUID id
         + String name
-        + Time startAt
-        + Time endAt
-        + Optional<boolean> shareable
-        + Optional<UUID> roomID
     }
 
-    ' class DBEventTag {
-    '     + UUID eventID
-    '     + UUID tagID
-    '     + boolean locked
-    ' }
-
-    class DBUserAttendance {
-        + UUID eventID
-        + UUID userID
-        + AttendanceState state
-    }
+    DBEvent --|> "0..*" DBTag : tags
 }
-
 }
-
-}
-
-DBRoom --|> DBUser : createdBy
-
-' ある種の many to many．
-' 出欠状態 (AttendanceState) を保持する必要があるため gorm の many2many は使用できない
-DBUserAttendance "0..*" <--|> "1" DBUser
-DBEvent "1" <--|> "0..*" DBUserAttendance
-
-' DBEventTag "0..*" <--|> "1" DBTag
-' DBEvent <--|> "0..*" DBEventTag
-
-DBEvent "0..*" <--|> "0..*" DBTag
-
-' venueType が room の場合のみ 1
-DBEvent --|> "0, 1" DBRoom
-
-DBEvent --|> "1" DBUser : createdByID で指定
-
-DBEvent --|> "1" DBGroup : groupID で指定
-
-DBEvent --|> "1" DBVenue
-
-' このDBVenue の venueType は room でないといけない
-DBVenue "0..*" <|-- DBRoom
-
-' 定期的に traQ の api を叩いてこれを更新する必要がある
-DBGroup "0..*" <--|> "0..*" DBUser : メンバー many2many
-DBGroup "0..*" <--|> "1..*" DBUser : アドミン many2many
-
-
 
 @enduml

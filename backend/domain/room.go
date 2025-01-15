@@ -3,7 +3,7 @@ package domain
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/gofrs/uuid"
 )
 
 type Room struct {
@@ -11,7 +11,6 @@ type Room struct {
 	Name    string
 	StartAt time.Time
 	EndAt   time.Time
-	Model
-	CreatedBy  User
-	RoomVenues []RoomVenue
+
+	Events []RoomEvent
 }

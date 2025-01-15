@@ -7,6 +7,7 @@ import (
 	"time"
 
 	gomysql "github.com/go-sql-driver/mysql"
+	"github.com/iChemy/MyKnoQ/backend/infra/db/model"
 	"github.com/iChemy/MyKnoQ/backend/utils"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -87,6 +88,19 @@ func Setup() (*KnoQDatabaseAPI, error) {
 	if err != nil {
 		// Log the error before returning
 		log.Printf("failed to connect to database: %v", err)
+		return nil, err
+	}
+
+	err = db.AutoMigrate(
+		&model.User{},
+		&model.Event{},
+		&model.Participant{},
+		&model.Group{},
+		&model.Membership{},
+		&model.Room{},
+		&model.Tag{},
+	)
+	if err != nil {
 		return nil, err
 	}
 
